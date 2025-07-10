@@ -1,0 +1,74 @@
+# Python
+__pycache__/
+*.pyc
+*.pyo
+*.pyd
+.Python
+*.so
+.venv/
+venv/
+env/
+pixelenv/
+
+# Data files (consider if you want to track these)
+*.csv
+*.tsv
+*.json
+*.h5
+*.fasta
+
+# Results/outputs
+results/
+outputs/
+plots/
+pairwise_data/
+temp/
+*.log
+
+# Generated images/plots
+*.png
+*.jpg
+*.jpeg
+*.pdf
+*.svg
+
+# OS files
+.DS_Store
+Thumbs.db
+
+# IDE files
+.vscode/
+.idea/
+*.swp
+*.swo
+
+# Jupyter Notebook
+.ipynb_checkpoints
+
+# Environment files
+.env
+.env.local
+.env.*.local
+
+# Bash scripts (if they contain sensitive info)
+*.bash
+
+# Specific to your project structure
+confusion_matrix/*.tsv
+confusion_matrix/*.png
+erikson_benchmark/erickson_data/*.tsv
+erikson_benchmark/erickson_data/*.png
+erikson_benchmark/seo_data/*.tsv
+erikson_benchmark/seo_data/*.png
+erikson_benchmark/plots/
+erikson_benchmark/pairwise_data/
+erikson_benchmark/*.fasta
+tm_class/temp/
+jupyter_assets/*.png
+
+# Keep important files (uncomment if you want to track these)
+# !requirements.txt
+# !*.py
+# !*.md
+# !*.yml
+# !*.yaml

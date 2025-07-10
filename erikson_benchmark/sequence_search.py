@@ -6,6 +6,8 @@ import argparse
 from collections import defaultdict
 import time
 
+# python sequence_search.py my_enzymes.csv reference_database.fasta results_robust.csv --search_type robust
+
 def read_csv_sequences(csv_file):
     """Read protein sequences from CSV file"""
     sequences = {}
@@ -116,7 +118,7 @@ def optimized_robust_search(csv_sequences, fasta_sequences, min_overlap=6, simil
         if not csv_seq or len(csv_seq) < min_overlap:
             results.append({
                 'Enzyme_ID': enzyme_id,
-                'CSV_Sequence': 'Too short or empty',
+                'CSV_Sequence': csv_seq if csv_seq else 'Empty',  # Don't truncate, show empty if empty
                 'CSV_Length': len(csv_seq) if csv_seq else 0,
                 'Match_Type': 'No Match',
                 'Best_Match_Details': 'Sequence too short',
@@ -138,7 +140,7 @@ def optimized_robust_search(csv_sequences, fasta_sequences, min_overlap=6, simil
         if not candidate_sequences:
             results.append({
                 'Enzyme_ID': enzyme_id,
-                'CSV_Sequence': csv_seq[:50] + '...' if len(csv_seq) > 50 else csv_seq,
+                'CSV_Sequence': csv_seq,  # Keep full sequence - no truncation
                 'CSV_Length': len(csv_seq),
                 'Match_Type': 'No Match',
                 'Best_Match_Details': 'No k-mer overlap found',
@@ -186,7 +188,7 @@ def optimized_robust_search(csv_sequences, fasta_sequences, min_overlap=6, simil
                     'exact_match_type': exact_match_type,
                     'lcs_length': lcs_length,
                     'kmer_similarity': round(kmer_similarity, 2),
-                    'longest_common_substring': lcs[:20] + '...' if len(lcs) > 20 else lcs
+                    'longest_common_substring': lcs  # Keep full LCS - no truncation
                 })
         
         # Sort by k-mer similarity and LCS length
@@ -209,7 +211,7 @@ def optimized_robust_search(csv_sequences, fasta_sequences, min_overlap=6, simil
         
         results.append({
             'Enzyme_ID': enzyme_id,
-            'CSV_Sequence': csv_seq[:50] + '...' if len(csv_seq) > 50 else csv_seq,
+            'CSV_Sequence': csv_seq,  # Keep full sequence - no truncation
             'CSV_Length': len(csv_seq),
             'Match_Type': match_type,
             'Best_Match_Details': match_details,
@@ -217,7 +219,8 @@ def optimized_robust_search(csv_sequences, fasta_sequences, min_overlap=6, simil
             'Top_Similarity': best_matches[0]['kmer_similarity'] if best_matches else 0.0,
             'Top_LCS_Length': best_matches[0]['lcs_length'] if best_matches else 0,
             'All_Matches': '; '.join([f"{m['fasta_id']}({m['kmer_similarity']}%)" 
-                                    for m in best_matches[:5]]) if best_matches else 'None'
+                                    for m in best_matches[:5]]) if best_matches else 'None',
+            'Longest_Common_Substring': best_matches[0]['longest_common_substring'] if best_matches else ''  # Added full LCS column
         })
     
     return results
@@ -237,7 +240,7 @@ def exact_match_search(csv_sequences, fasta_sequences):
         
         results.append({
             'Enzyme_ID': enzyme_id,
-            'CSV_Sequence': csv_seq,
+            'CSV_Sequence': csv_seq,  # Keep full sequence - no truncation
             'Match_Type': 'Exact' if matches else 'No Match',
             'Matched_FASTA_IDs': ', '.join(matches) if matches else 'None',
             'Number_of_Matches': len(matches)
