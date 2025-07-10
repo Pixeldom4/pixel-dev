@@ -27,11 +27,14 @@ def calculate_sequence_identity(seq1, seq2):
 def read_prediction_data(filename):
     """Read prediction data from TSV file"""
     try:
-        # Try different separators
+        # Try different separators, skip header row
         try:
-            df = pd.read_csv(filename, sep='\t')
+            df = pd.read_csv(filename, sep='\t', header=None, skiprows=1)
         except:
-            df = pd.read_csv(filename)
+            df = pd.read_csv(filename, header=None, skiprows=1)
+        
+        # Assign column names based on position
+        df.columns = ['ID', 'Tm', 'Predicted_Tm', 'Sequence']
         
         print(f"Loaded {len(df)} proteins from {filename}")
         print(f"Columns: {list(df.columns)}")
@@ -40,17 +43,12 @@ def read_prediction_data(filename):
         print(f"Error reading {filename}: {e}")
         return None
 
-def generate_pairwise_data(df, id_col, true_tm_col, pred_tm_col, sequence_col, output_file,
-                          max_pairs=None, min_pctid=None, max_pctid=None):
+def generate_pairwise_data(df, output_file, max_pairs=None, min_pctid=None, max_pctid=None):
     """
     Generate pairwise data from prediction results
     
     Args:
-        df: DataFrame with protein data
-        id_col: Column name for protein IDs
-        true_tm_col: Column name for true melting temperatures
-        pred_tm_col: Column name for predicted melting temperatures
-        sequence_col: Column name for sequences
+        df: DataFrame with protein data (columns: ID, Tm, Predicted_Tm, Sequence)
         output_file: Output file path
         max_pairs: Maximum number of pairs to generate
         min_pctid: Minimum sequence identity threshold
@@ -62,10 +60,10 @@ def generate_pairwise_data(df, id_col, true_tm_col, pred_tm_col, sequence_col, o
     for _, row in df.iterrows():
         try:
             protein = {
-                'id': str(row[id_col]).strip(),
-                'true_tm': float(row[true_tm_col]),
-                'pred_tm': float(row[pred_tm_col]),
-                'sequence': str(row[sequence_col]).strip()
+                'id': str(row['ID']).strip(),
+                'true_tm': float(row['Tm']),
+                'pred_tm': float(row['Predicted_Tm']),
+                'sequence': str(row['Sequence']).strip()
             }
             proteins_data.append(protein)
         except Exception as e:
@@ -162,35 +160,16 @@ Examples:
     
     # With filtering
     python generate_pairwise_single.py --input predictions.tsv --output pairwise_data.tsv --min_pctid 0.1 --max_pctid 0.9 --max_pairs 5000
-    
-    # Custom column names
-    python generate_pairwise_single.py --input predictions.tsv --output pairwise_data.tsv --id_col "Protein_ID" --true_tm_col "Experimental_Tm"
         """
     )
     
     parser.add_argument("--input", "-i", 
                         type=str, required=True,
-                        help="TSV file with prediction results")
+                        help="TSV file with prediction results (columns: ID, Tm, Predicted_Tm, Sequence)")
     
     parser.add_argument("--output", "-o", 
                         type=str, required=True,
                         help="Output TSV file for pairwise data")
-    
-    parser.add_argument("--id_col", 
-                        type=str, default="ID",
-                        help="Column name for protein IDs (default: 'ID')")
-    
-    parser.add_argument("--true_tm_col", 
-                        type=str, default="Tm",
-                        help="Column name for true melting temperatures (default: 'Tm')")
-    
-    parser.add_argument("--pred_tm_col", 
-                        type=str, default="Predicted Melting Point",
-                        help="Column name for predicted melting temperatures (default: 'Predicted Melting Point')")
-    
-    parser.add_argument("--sequence_col", 
-                        type=str, default="Sequence",
-                        help="Column name for protein sequences (default: 'Sequence')")
     
     parser.add_argument("--max_pairs", 
                         type=int, default=None,
@@ -219,14 +198,6 @@ Examples:
     if df is None:
         return 1
     
-    # Validate column names
-    required_cols = [args.id_col, args.true_tm_col, args.pred_tm_col, args.sequence_col]
-    missing_cols = [col for col in required_cols if col not in df.columns]
-    if missing_cols:
-        print(f"Error: Missing columns: {missing_cols}")
-        print(f"Available columns: {list(df.columns)}")
-        return 1
-    
     # Create output directory if needed
     output_dir = os.path.dirname(args.output)
     if output_dir and not os.path.exists(output_dir):
@@ -236,10 +207,6 @@ Examples:
     try:
         result_df = generate_pairwise_data(
             df=df,
-            id_col=args.id_col,
-            true_tm_col=args.true_tm_col,
-            pred_tm_col=args.pred_tm_col,
-            sequence_col=args.sequence_col,
             output_file=args.output,
             max_pairs=args.max_pairs,
             min_pctid=args.min_pctid,
