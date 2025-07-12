@@ -16,15 +16,20 @@ def load_data(file_path):
         sys.exit(1)
 
 def classify_prediction(y_true, y_pred):
-    """Classify based on y_true sign only."""
+    """Classify prediction into TP, FP, TN, FN based on sign."""
     actual_positive = y_true > 0
+    predicted_positive = y_pred > 0
     
-    if actual_positive:
-        return 'POS'  # Positive relationship
+    if actual_positive and predicted_positive:
+        return 'TP'
+    elif not actual_positive and predicted_positive:
+        return 'FP'
+    elif actual_positive and not predicted_positive:
+        return 'FN'
     else:
-        return 'NEG'  # Negative relationship
+        return 'TN'
 
-def create_confusion_matrix_data(df, mirror_diagonal=True):  # Changed default to True
+def create_confusion_matrix_data(df, mirror_diagonal=False):
     """Create matrix data structure for visualization."""
     # Extract sequence identifiers
     df['label1_clean'] = df['label1'].astype(str).str.replace('tensor(', '').str.replace(')', '')
@@ -49,29 +54,28 @@ def create_confusion_matrix_data(df, mirror_diagonal=True):  # Changed default t
         classification = classify_prediction(row['y_true'], row['y_pred'])
         
         matrix_data.loc[ref_seq, target_seq] = classification
-        matrix_values.loc[ref_seq, target_seq] = row['y_true']  # Use actual y_true value
+        matrix_values.loc[ref_seq, target_seq] = row['y_true'] - row['y_pred']  # For color intensity
         
         # Mirror across diagonal if requested
         if mirror_diagonal and ref_seq != target_seq:
-            # Mirror with flipped classification and negated values
-            flipped_classification = 'NEG' if classification == 'POS' else 'POS'
-            matrix_data.loc[target_seq, ref_seq] = flipped_classification
-            matrix_values.loc[target_seq, ref_seq] = -row['y_true']  # Negate the value
+            # Mirror the exact same classification and values
+            matrix_data.loc[target_seq, ref_seq] = classification
+            matrix_values.loc[target_seq, ref_seq] = row['y_true'] - row['y_pred']
     
     return matrix_data, matrix_values, all_sequences
 
-def plot_confusion_matrix(matrix_data, matrix_values, all_sequences, output_file=None, mirror_diagonal=True):  # Changed default to True
+def plot_confusion_matrix(matrix_data, matrix_values, all_sequences, output_file=None, mirror_diagonal=False):
     """Create and display the confusion matrix visualization."""
     # Create numeric matrix for plotting
-    classification_map = {'POS': 1, 'NEG': 2}
+    classification_map = {'TP': 1, 'FP': 2, 'FN': 3, 'TN': 4}
     numeric_matrix = matrix_data.applymap(lambda x: classification_map.get(x, 0))
     
     # Set up the plot
     plt.figure(figsize=(max(12, len(all_sequences) * 0.8), max(8, len(all_sequences) * 0.6)))
     
     # Create custom colormap
-    colors = ['white', '#2ecc71', '#e74c3c']  # white, green (positive), red (negative)
-    n_bins = 3
+    colors = ['white', '#2ecc71', '#e74c3c', '#f39c12', '#3498db']  # white, green, red, orange, blue
+    n_bins = 5
     cmap = plt.matplotlib.colors.ListedColormap(colors)
     
     # Create the heatmap
@@ -89,12 +93,12 @@ def plot_confusion_matrix(matrix_data, matrix_values, all_sequences, output_file
     # Add diagonal line if mirroring is enabled
     if mirror_diagonal:
         ax.plot([0, len(all_sequences)], [0, len(all_sequences)], 'k--', alpha=0.5, linewidth=2)
-        title_suffix = " (with diagonal mirroring - flipped values)"
+        title_suffix = " (with diagonal mirroring)"
     else:
         title_suffix = ""
     
     # Customize the plot
-    plt.title(f'Sequence Pair Relationship Matrix{title_suffix}\n(Reference sequences vs Target sequences)', 
+    plt.title(f'Sequence Pair Confusion Matrix{title_suffix}\n(Reference sequences vs Target sequences)', 
               fontsize=16, fontweight='bold', pad=20)
     plt.xlabel('Target Sequences', fontsize=12, fontweight='bold')
     plt.ylabel('Reference Sequences', fontsize=12, fontweight='bold')
@@ -105,8 +109,10 @@ def plot_confusion_matrix(matrix_data, matrix_values, all_sequences, output_file
     
     # Add legend
     legend_elements = [
-        plt.Rectangle((0,0),1,1, facecolor='#2ecc71', label='Positive Relationship (POS)'),
-        plt.Rectangle((0,0),1,1, facecolor='#e74c3c', label='Negative Relationship (NEG)')
+        plt.Rectangle((0,0),1,1, facecolor='#2ecc71', label='True Positive (TP)'),
+        plt.Rectangle((0,0),1,1, facecolor='#e74c3c', label='False Positive (FP)'),
+        plt.Rectangle((0,0),1,1, facecolor='#f39c12', label='False Negative (FN)'),
+        plt.Rectangle((0,0),1,1, facecolor='#3498db', label='True Negative (TN)')
     ]
     if mirror_diagonal:
         legend_elements.append(plt.Line2D([0], [0], color='black', linestyle='--', alpha=0.5, label='Diagonal (mirror line)'))
@@ -122,35 +128,46 @@ def plot_confusion_matrix(matrix_data, matrix_values, all_sequences, output_file
     plt.show()
 
 def calculate_metrics(df):
-    """Calculate and display basic statistics."""
-    # Count classifications based on y_true only
-    classifications = df.apply(lambda row: classify_prediction(row['y_true'], row['y_pred']), axis=1)
-    pos_count = (classifications == 'POS').sum()
-    neg_count = (classifications == 'NEG').sum()
-    
-    # Calculate prediction accuracy for reference
+    """Calculate and display performance metrics."""
+    # Convert to binary classifications
     y_true_binary = (df['y_true'] > 0).astype(int)
     y_pred_binary = (df['y_pred'] > 0).astype(int)
+    
+    # Calculate metrics
     accuracy = accuracy_score(y_true_binary, y_pred_binary)
+    precision = precision_score(y_true_binary, y_pred_binary, zero_division=0)
+    recall = recall_score(y_true_binary, y_pred_binary, zero_division=0)
+    f1 = f1_score(y_true_binary, y_pred_binary, zero_division=0)
+    
+    # Count classifications
+    classifications = df.apply(lambda row: classify_prediction(row['y_true'], row['y_pred']), axis=1)
+    tp_count = (classifications == 'TP').sum()
+    fp_count = (classifications == 'FP').sum()
+    fn_count = (classifications == 'FN').sum()
+    tn_count = (classifications == 'TN').sum()
     
     # Print results
     print("\n" + "="*50)
-    print("SEQUENCE RELATIONSHIP STATISTICS")
+    print("CONFUSION MATRIX STATISTICS")
     print("="*50)
-    print(f"Positive Relationships:  {pos_count}")
-    print(f"Negative Relationships:  {neg_count}")
-    print(f"Total Pairs:            {len(df)}")
+    print(f"True Positives (TP):  {tp_count}")
+    print(f"False Positives (FP): {fp_count}")
+    print(f"False Negatives (FN): {fn_count}")
+    print(f"True Negatives (TN):  {tn_count}")
     print("-"*30)
-    print(f"Prediction Accuracy:    {accuracy:.3f}")
+    print(f"Accuracy:   {accuracy:.3f}")
+    print(f"Precision:  {precision:.3f}")
+    print(f"Recall:     {recall:.3f}")
+    print(f"F1 Score:   {f1:.3f}")
     print("="*50)
 
 def main():
     """Main function to run the confusion matrix generator."""
-    parser = argparse.ArgumentParser(description='Generate sequence pair relationship matrix')
+    parser = argparse.ArgumentParser(description='Generate sequence pair confusion matrix')
     parser.add_argument('input_file', help='Input TSV file path')
     parser.add_argument('--output', '-o', help='Output image file path (optional)')
     parser.add_argument('--show-data', '-s', action='store_true', help='Show first few rows of data')
-    parser.add_argument('--no-mirror', '-n', action='store_true', help='Disable diagonal mirroring (mirroring is enabled by default)')  # Changed flag logic
+    parser.add_argument('--mirror', '-m', action='store_true', help='Mirror matrix across diagonal')
     
     args = parser.parse_args()
     
@@ -173,24 +190,19 @@ def main():
         print("\nFirst 5 rows of data:")
         print(df.head())
     
-    # Reverse the mirroring logic - now enabled by default, disabled with --no-mirror
-    mirror_enabled = not args.no_mirror
-    
-    if mirror_enabled:
-        print("Mirror mode enabled by default: Matrix will be mirrored across the diagonal")
-    else:
-        print("Mirror mode disabled: Matrix will not be mirrored across the diagonal")
+    if args.mirror:
+        print("Mirror mode enabled: Matrix will be mirrored across the diagonal")
     
     # Create confusion matrix data
-    print("\nGenerating relationship matrix...")
-    matrix_data, matrix_values, all_sequences = create_confusion_matrix_data(df, mirror_enabled)
+    print("\nGenerating confusion matrix...")
+    matrix_data, matrix_values, all_sequences = create_confusion_matrix_data(df, args.mirror)
     
     # Calculate and display metrics
     calculate_metrics(df)
     
     # Create visualization
     print("\nCreating visualization...")
-    plot_confusion_matrix(matrix_data, matrix_values, all_sequences, args.output, mirror_enabled)
+    plot_confusion_matrix(matrix_data, matrix_values, all_sequences, args.output, args.mirror)
 
 def demo_with_sample_data():
     """Demo function with sample data for testing."""
@@ -208,15 +220,15 @@ def demo_with_sample_data():
     print("Running demo with sample data...")
     print(f"Sample data shape: {df.shape}")
     
-    # Show both versions - now mirrored by default first
-    print("\n1. Mirrored matrix (default behavior):")
-    matrix_data_mirror, matrix_values_mirror, all_sequences_mirror = create_confusion_matrix_data(df, mirror_diagonal=True)
-    calculate_metrics(df)
-    plot_confusion_matrix(matrix_data_mirror, matrix_values_mirror, all_sequences_mirror, mirror_diagonal=True)
-    
-    print("\n2. Standard matrix (no mirroring):")
+    # Show both versions
+    print("\n1. Standard matrix (no mirroring):")
     matrix_data, matrix_values, all_sequences = create_confusion_matrix_data(df, mirror_diagonal=False)
+    calculate_metrics(df)
     plot_confusion_matrix(matrix_data, matrix_values, all_sequences, mirror_diagonal=False)
+    
+    print("\n2. Mirrored matrix:")
+    matrix_data_mirror, matrix_values_mirror, all_sequences_mirror = create_confusion_matrix_data(df, mirror_diagonal=True)
+    plot_confusion_matrix(matrix_data_mirror, matrix_values_mirror, all_sequences_mirror, mirror_diagonal=True)
 
 if __name__ == "__main__":
     if len(sys.argv) == 1:
