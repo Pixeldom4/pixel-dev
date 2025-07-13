@@ -67,8 +67,8 @@ tm_class/temp/
 jupyter_assets/*.png
 
 # Keep important files (uncomment if you want to track these)
-# !requirements.txt
-# !*.py
-# !*.md
+!requirements.txt
+!*.py
+!*.md
 # !*.yml
 # !*.yaml
