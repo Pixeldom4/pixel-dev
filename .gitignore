@@ -51,7 +51,7 @@ Thumbs.db
 .env.*.local
 
 # Bash scripts (if they contain sensitive info)
-*.bash
+# *.bash
 
 # Specific to your project structure
 confusion_matrix/*.tsv
